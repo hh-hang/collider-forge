@@ -1,6 +1,6 @@
 # collider-forge
 
-Language: [中文](./README.md) | [English](./README.en.md)
+[简体中文](README.md) | English
 
 Visual tool for loading glTF and 3D Tiles, generating collision meshes, and exporting collider `.glb` files.
 
@@ -37,3 +37,11 @@ Local file loading is intended for `.glb` / `.gltf` assets. A `.gltf` file that 
 This repository includes several third-party JavaScript and WebAssembly runtime files under `public/libs` for model decoding, texture transcoding, and Draco export support.
 
 See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for details.
+
+## Credits
+
+[three.js](https://github.com/mrdoob/three.js)
+
+[3d-tiles-renderer](https://github.com/NASA-AMMOS/3D-Tiles-Renderer-ThreeJS)
+
+[draco](https://github.com/google/draco)

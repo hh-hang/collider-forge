@@ -1,6 +1,6 @@
 # collider-forge
 
-语言: [中文](./README.md) | [English](./README.en.md)
+简体中文 | [English](README_En.md)
 
 一个用于加载 glTF 与 3D Tiles、生成碰撞网格并导出 collider `.glb` 的可视化工具。
 
@@ -37,3 +37,11 @@ Vite 开发服务器默认运行在 `5174` 端口。
 本仓库在 `public/libs` 下包含若干第三方 JavaScript 和 WebAssembly 运行时文件，用于模型解码、纹理转码和 Draco 导出。
 
 详见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
+
+## 致谢
+
+[three.js](https://github.com/mrdoob/three.js)
+
+[3d-tiles-renderer](https://github.com/NASA-AMMOS/3D-Tiles-Renderer-ThreeJS)
+
+[draco](https://github.com/google/draco)
