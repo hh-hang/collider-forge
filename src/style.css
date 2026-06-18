@@ -1,0 +1,536 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #1a1d22;
+    color: #e6e6e6;
+}
+
+#viewport {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* 右上角功能面板 */
+#panel {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 240px;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid #3a3f47;
+    border-radius: 8px;
+    background: rgba(42, 46, 53, 0.85);
+    font-size: 13px;
+    z-index: 10;
+}
+
+/* 面板分组 */
+.group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.group + .group {
+    padding-top: 12px;
+    border-top: 1px solid #3a3f47;
+}
+
+.group.hidden {
+    display: none;
+}
+
+.group-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #8a909a;
+    letter-spacing: 0.04em;
+}
+
+/* 按钮 */
+#panel button {
+    padding: 8px 12px;
+    border: 1px solid #3a3f47;
+    border-radius: 6px;
+    background: #2a2e35;
+    color: #e6e6e6;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+#panel button:hover:not(:disabled) {
+    background: #353a42;
+    border-color: #4a90d9;
+}
+
+#panel button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* 并排按钮行 */
+.btn-row {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-row button {
+    flex: 1;
+}
+
+.panel-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.panel-row.hidden {
+    display: none;
+}
+
+.panel-row label {
+    color: #c8ccd2;
+}
+
+/* 数值输入行 */
+.num-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.num-row label {
+    color: #c8ccd2;
+}
+
+.num-row input {
+    width: 90px;
+    padding: 4px 6px;
+    border: 1px solid #3a3f47;
+    border-radius: 4px;
+    background: #1f2228;
+    color: #e6e6e6;
+    font-size: 13px;
+}
+
+.num-row input:focus {
+    outline: none;
+    border-color: #4a90d9;
+}
+
+/* errorTarget 滑块 */
+#error-target-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.slider-label {
+    display: flex;
+    justify-content: space-between;
+    color: #c8ccd2;
+}
+
+#error-target-value {
+    color: #4a90d9;
+    font-variant-numeric: tabular-nums;
+}
+
+.slider-hint {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #6b7178;
+}
+
+#error-target {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: #3a3f47;
+    cursor: pointer;
+    outline: none;
+}
+
+#error-target::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #4a90d9;
+    border: 2px solid #1a1d22;
+    cursor: pointer;
+}
+
+#error-target::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #4a90d9;
+    border: 2px solid #1a1d22;
+    cursor: pointer;
+}
+
+.panel-row .hint {
+    color: #6b7178;
+    font-size: 12px;
+}
+
+#row-show-collider {
+    cursor: pointer;
+    color: #c8ccd2;
+}
+
+/* 全屏导入遮罩 */
+#overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20, 22, 26, 0.72);
+    backdrop-filter: blur(2px);
+    z-index: 20;
+    transition: opacity 0.2s;
+}
+
+#overlay.hidden {
+    display: none;
+}
+
+/* 导入面板 */
+#import-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+    padding: 32px 40px;
+    border: 2px dashed #3a3f47;
+    border-radius: 12px;
+    background: rgba(42, 46, 53, 0.85);
+    transition: border-color 0.2s, background 0.2s;
+}
+
+#overlay.dragover #import-panel {
+    border-color: #4a90d9;
+    background: rgba(74, 144, 217, 0.18);
+}
+
+#btn-pick-file {
+    padding: 8px 20px;
+    border: 1px solid #4a90d9;
+    border-radius: 6px;
+    background: #2a4a6e;
+    color: #e6e6e6;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+#btn-pick-file:hover {
+    background: #335a86;
+}
+
+/* 导入分隔线 */
+.import-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    font-size: 12px;
+    color: #6b7178;
+}
+
+.import-divider::before,
+.import-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #3a3f47;
+}
+
+#source-row {
+    display: flex;
+    gap: 8px;
+    pointer-events: auto;
+}
+
+#url-row {
+    display: flex;
+    gap: 8px;
+}
+
+#url-row.hidden {
+    display: none;
+}
+
+#format-select {
+    padding: 8px 10px;
+    border: 1px solid #3a3f47;
+    border-radius: 6px;
+    background: #1f2228;
+    color: #e6e6e6;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+#format-select:focus {
+    outline: none;
+    border-color: #4a90d9;
+}
+
+#url-input {
+    width: 280px;
+    padding: 8px 12px;
+    border: 1px solid #3a3f47;
+    border-radius: 6px;
+    background: #1f2228;
+    color: #e6e6e6;
+    font-size: 14px;
+}
+
+#url-input:focus {
+    outline: none;
+    border-color: #4a90d9;
+}
+
+#btn-load-url {
+    padding: 8px 16px;
+    border: 1px solid #3a3f47;
+    border-radius: 6px;
+    background: #2a2e35;
+    color: #e6e6e6;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+#btn-load-url:hover {
+    background: #353a42;
+    border-color: #4a90d9;
+}
+
+/* Cesium Ion 加载区 */
+#ion-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    pointer-events: auto;
+}
+
+#ion-panel.hidden {
+    display: none;
+}
+
+#ion-token {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #3a3f47;
+    border-radius: 6px;
+    background: #1f2228;
+    color: #e6e6e6;
+    font-size: 14px;
+}
+
+#ion-token:focus {
+    outline: none;
+    border-color: #4a90d9;
+}
+
+.ion-origin-title {
+    font-size: 12px;
+    color: #9aa0a8;
+}
+
+.ion-origin-row {
+    display: flex;
+    gap: 8px;
+}
+
+.ion-origin-row label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    font-size: 11px;
+    color: #9aa0a8;
+}
+
+.ion-origin-row input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #3a3f47;
+    border-radius: 6px;
+    background: #1f2228;
+    color: #e6e6e6;
+    font-size: 13px;
+}
+
+.ion-origin-row input:focus {
+    outline: none;
+    border-color: #4a90d9;
+}
+
+#btn-load-ion {
+    padding: 8px 16px;
+    border: 1px solid #4a90d9;
+    border-radius: 6px;
+    background: #2a4a6e;
+    color: #e6e6e6;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+#btn-load-ion:hover {
+    background: #335a86;
+}
+
+/* 导出选项弹窗 */
+#export-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20, 22, 26, 0.72);
+    backdrop-filter: blur(2px);
+    z-index: 40;
+}
+
+#export-overlay.hidden {
+    display: none;
+}
+
+#export-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 280px;
+    padding: 20px 22px;
+    border: 1px solid #3a3f47;
+    border-radius: 10px;
+    background: rgba(42, 46, 53, 0.96);
+    font-size: 13px;
+}
+
+.export-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #e6e6e6;
+}
+
+.export-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 4px;
+    border-top: 1px solid #3a3f47;
+}
+
+.export-section-title {
+    font-size: 12px;
+    color: #9aa0a8;
+    margin-bottom: 2px;
+}
+
+/* 自定义 radio */
+.export-section input[type="radio"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    border: 1px solid #5a606a;
+    border-radius: 50%;
+    background: #2a2e35;
+    cursor: pointer;
+    display: grid;
+    place-content: center;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.export-section input[type="radio"]::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4a90d9;
+    transform: scale(0);
+    transition: transform 0.12s ease-in-out;
+}
+
+.export-section input[type="radio"]:checked {
+    border-color: #4a90d9;
+}
+
+.export-section input[type="radio"]:checked::before {
+    transform: scale(1);
+}
+
+.export-section input[type="radio"]:hover {
+    border-color: #6b93c0;
+}
+
+.export-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 4px;
+}
+
+.export-actions button {
+    padding: 7px 18px;
+    border-radius: 6px;
+    border: 1px solid #3a3f47;
+    background: #2a2e35;
+    color: #e6e6e6;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.export-actions button:hover {
+    background: #353a42;
+}
+
+#btn-export-confirm {
+    border-color: #4a90d9;
+    background: #2a4a6e;
+}
+
+#btn-export-confirm:hover {
+    background: #335a86;
+}
+
+/* 左下角状态条 */
+#status {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    font-size: 13px;
+    color: #9aa0a8;
+    /* 高于导入遮罩,保证状态可见 */
+    z-index: 30;
+    pointer-events: none;
+}

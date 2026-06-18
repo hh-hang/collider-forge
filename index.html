@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>collider-forge</title>
+        <link rel="stylesheet" href="/src/style.css" />
+    </head>
+    <body>
+        <div id="app">
+            <canvas id="viewport"></canvas>
+
+            <!-- 右上角功能面板 -->
+            <div id="panel">
+                <!-- 碰撞体操作 -->
+                <div class="group">
+                    <div class="group-title">Collider</div>
+                    <div class="btn-row">
+                        <button id="btn-generate" disabled>Generate</button>
+                        <button id="btn-clear" disabled>Clear</button>
+                    </div>
+                    <div class="btn-row">
+                        <button id="btn-import">Import</button>
+                        <button id="btn-export" disabled>Export</button>
+                    </div>
+                    <label id="row-show-collider" class="panel-row hidden">
+                        <input id="show-collider" type="checkbox" checked />
+                        Show
+                    </label>
+                </div>
+
+                <!-- 3D Tiles 参数 -->
+                <div id="group-tiles" class="group hidden">
+                    <div class="group-title">3D Tiles</div>
+                    <div id="error-target-row">
+                        <div class="slider-label">
+                            <span>errorTarget</span>
+                            <span id="error-target-value">4</span>
+                        </div>
+                        <input id="error-target" type="range" min="0" max="32" step="1" value="4" />
+                        <div class="slider-hint">
+                            <span>Detailed</span>
+                            <span>Coarse</span>
+                        </div>
+                    </div>
+                    <div class="num-row">
+                        <label for="cache-max-size">maxSize</label>
+                        <input id="cache-max-size" type="number" min="100" step="100" />
+                    </div>
+                    <div class="num-row">
+                        <label for="cache-max-bytes">maxBytesSize (GB)</label>
+                        <input id="cache-max-bytes" type="number" min="0.1" step="0.1" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- 隐藏的碰撞体文件选择 -->
+            <input id="collider-file" type="file" accept=".glb,.gltf" hidden />
+
+            <!-- 全屏遮罩:无模型时铺满屏幕,导入面板浮于其中 -->
+            <div id="overlay">
+                <!-- 导入区:拖拽 glb 或输入模型地址 -->
+                <div id="import-panel">
+                    <button id="btn-pick-file" title="Local files are supported for glb / gltf only">
+                        Choose local glb / gltf
+                    </button>
+                    <div class="import-divider">or enter a URL</div>
+                    <div id="source-row">
+                        <select id="format-select" title="Model format">
+                            <option value="3dtiles">3D Tiles</option>
+                            <option value="ion">Google 3D Tiles (Ion)</option>
+                            <option value="gltf">glb / gltf</option>
+                        </select>
+                        <div id="url-row">
+                            <input id="url-input" type="text" placeholder="https://example.com/tileset.json" />
+                            <button id="btn-load-url">Load</button>
+                        </div>
+                    </div>
+
+                    <!-- Cesium Ion 加载区 -->
+                    <div id="ion-panel" class="hidden">
+                        <input
+                            id="ion-token"
+                            type="text"
+                            placeholder="Cesium Ion access token"
+                            title="Your Cesium Ion access token (stored locally in this browser)"
+                        />
+                        <div class="ion-origin-title">Origin (scene placed at this point)</div>
+                        <div class="ion-origin-row">
+                            <label>Lon<input id="origin-lon" type="number" step="any" /></label>
+                            <label>Lat<input id="origin-lat" type="number" step="any" /></label>
+                            <label>Alt<input id="origin-height" type="number" step="any" /></label>
+                        </div>
+                        <button id="btn-load-ion">Load Google 3D Tiles</button>
+                    </div>
+                </div>
+
+                <!-- 隐藏的模型文件选择 -->
+                <input id="model-file" type="file" accept=".glb,.gltf" hidden />
+            </div>
+
+            <!-- 导出选项弹窗 -->
+            <div id="export-overlay" class="hidden">
+                <div id="export-dialog">
+                    <div class="export-title">Export collider</div>
+
+                    <label class="panel-row" title="Draco-compress on export (both engines decode it)">
+                        <input id="draco-export" type="checkbox" checked />
+                        Draco compress on export
+                    </label>
+
+                    <div class="export-section">
+                        <div class="export-section-title">Up axis</div>
+                        <label class="panel-row" title="For Cesium (Z-up Cartesian axes)">
+                            <input id="up-z" type="radio" name="up-axis" value="z" checked />
+                            Z-up
+                        </label>
+                        <label class="panel-row" title="For glTF / three.js (Y-up convention)">
+                            <input id="up-y" type="radio" name="up-axis" value="y" />
+                            Y-up
+                        </label>
+                    </div>
+
+                    <div class="export-actions">
+                        <button id="btn-export-cancel">Cancel</button>
+                        <button id="btn-export-confirm">Export</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="status"></div>
+        </div>
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>
