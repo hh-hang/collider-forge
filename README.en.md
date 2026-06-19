@@ -24,13 +24,7 @@ npm install
 npm run dev
 ```
 
-The Vite dev server runs on port `5174` by default.
-
-## Loading Models
-
-Local file loading is intended for `.glb` / `.gltf` assets. A `.gltf` file that depends on external `.bin` or texture files may not load correctly from a single file picker selection.
-
-3D Tiles are service or URL based. Use the URL loader or Cesium Ion loader for 3D Tiles rather than the local file picker.
+Open http://localhost:5174 in your browser.
 
 ## Third-Party Runtime Files
 
