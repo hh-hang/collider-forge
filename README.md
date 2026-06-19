@@ -24,13 +24,7 @@ npm install
 npm run dev
 ```
 
-Vite 开发服务器默认运行在 `5174` 端口。
-
-## 模型加载说明
-
-本地文件加载主要面向 `.glb` / `.gltf` 资产。如果 `.gltf` 依赖外部 `.bin` 或贴图文件，单文件选择可能无法完整加载。
-
-3D Tiles 通常是服务或 URL 形态，请使用 URL 加载或 Cesium Ion 加载，不要使用本地文件选择。
+打开浏览器访问 http://localhost:5174。
 
 ## 第三方运行时文件
 
