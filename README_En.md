@@ -6,6 +6,15 @@ Visual tool for loading glTF and 3D Tiles, generating collision meshes, and expo
 
 ![collider-forge demo](./public/imgs/demo.jpg)
 
+## Getting Started
+
+```bash
+npm install
+npm run dev
+```
+
+Open http://localhost:5174 in your browser.
+
 ## Features
 
 - Load local `.glb` / `.gltf` models.
@@ -17,21 +26,6 @@ Visual tool for loading glTF and 3D Tiles, generating collision meshes, and expo
 - Export collider `.glb` with optional Draco compression.
 - Choose export up axis for Cesium-style Z-up or glTF / three.js Y-up workflows.
 
-## Development
-
-```bash
-npm install
-npm run dev
-```
-
-Open http://localhost:5174 in your browser.
-
-## Third-Party Runtime Files
-
-This repository includes several third-party JavaScript and WebAssembly runtime files under `public/libs` for model decoding, texture transcoding, and Draco export support.
-
-See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for details.
-
 ## Credits
 
 [three.js](https://github.com/mrdoob/three.js)
@@ -39,3 +33,5 @@ See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for details.
 [3d-tiles-renderer](https://github.com/NASA-AMMOS/3D-Tiles-Renderer-ThreeJS)
 
 [draco](https://github.com/google/draco)
+
+> License notices for the third-party runtime files under `public/libs` are documented in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
