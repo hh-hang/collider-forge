@@ -9,6 +9,8 @@ Visual tool for loading glTF and 3D Tiles, generating collision meshes, and expo
 ## Getting Started
 
 ```bash
+git clone https://github.com/hh-hang/collider-forge.git
+cd collider-forge
 npm install
 npm run dev
 ```

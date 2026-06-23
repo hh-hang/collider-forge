@@ -9,6 +9,8 @@
 ## 快速开始
 
 ```bash
+git clone https://github.com/hh-hang/collider-forge.git
+cd collider-forge
 npm install
 npm run dev
 ```
