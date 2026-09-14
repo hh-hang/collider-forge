@@ -44,8 +44,38 @@ const btnLoadIon = document.getElementById("btn-load-ion") as HTMLButtonElement;
 
 const viewer = new Viewer(canvas);
 
+let busyStartedAt = 0;
+let busyMessage = "";
+let busyTimer: number | null = null;
+
 function setStatus(msg: string): void {
     statusEl.textContent = msg;
+}
+
+function renderBusyStatus(): void {
+    const elapsed = ((performance.now() - busyStartedAt) / 1000).toFixed(1);
+    statusEl.textContent = `${busyMessage} · ${elapsed}s`;
+}
+
+function startBusyStatus(msg: string): void {
+    if (busyTimer !== null) window.clearInterval(busyTimer);
+    busyStartedAt = performance.now();
+    busyMessage = msg;
+    statusEl.classList.add("busy");
+    renderBusyStatus();
+    busyTimer = window.setInterval(renderBusyStatus, 100);
+}
+
+function updateBusyStatus(msg: string): void {
+    busyMessage = msg;
+    renderBusyStatus();
+}
+
+function finishBusyStatus(msg: string): void {
+    if (busyTimer !== null) window.clearInterval(busyTimer);
+    busyTimer = null;
+    statusEl.classList.remove("busy");
+    setStatus(msg);
 }
 
 // 原始模型加载成功后隐藏导入面板,启用生成碰撞体
@@ -250,21 +280,25 @@ plyDepthInput.addEventListener("input", () => {
 btnGenerate.addEventListener("click", () => {
     const isPly = viewer.isPly();
     const depth = Number(plyDepthInput.value);
-    setStatus(isPly ? `Reconstructing PLY collider (depth ${depth})…` : "Generating collider…");
+    startBusyStatus(
+        isPly ? `Reconstructing PLY collider (depth ${depth})…` : "Generating collider…"
+    );
     btnGenerate.disabled = true;
 
     // 让状态文字先渲染再开始较重的合并或服务端重建
     requestAnimationFrame(async () => {
         try {
-            const ok = await viewer.generateCollider(depth);
+            const ok = await viewer.generateCollider(depth, (progress) => {
+                updateBusyStatus(progress.message);
+            });
             if (ok) {
                 onColliderReady();
-                setStatus("Collider generated (wireframe)");
+                finishBusyStatus("Collider generated (wireframe)");
             } else {
-                setStatus("Generation failed: no usable geometry in scene");
+                finishBusyStatus("Generation failed: no usable geometry in scene");
             }
         } catch (err) {
-            setStatus(`Generation failed: ${(err as Error).message}`);
+            finishBusyStatus(`Generation failed: ${(err as Error).message}`);
         } finally {
             btnGenerate.disabled = false;
         }

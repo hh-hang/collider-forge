@@ -533,9 +533,35 @@ body,
     position: fixed;
     bottom: 16px;
     left: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-size: 13px;
     color: #9aa0a8;
     /* 高于导入遮罩,保证状态可见 */
     z-index: 30;
     pointer-events: none;
+}
+
+#status.busy::before {
+    content: "";
+    width: 12px;
+    height: 12px;
+    flex: 0 0 auto;
+    border: 2px solid rgba(74, 144, 217, 0.3);
+    border-top-color: #4a90d9;
+    border-radius: 50%;
+    animation: status-spin 0.8s linear infinite;
+}
+
+@keyframes status-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #status.busy::before {
+        animation-duration: 1.6s;
+    }
 }

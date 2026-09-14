@@ -12,6 +12,12 @@ import { buildColliderGeometry, optimizeForExport, dracoCompressGLB } from "./co
 
 export type ModelFormat = "gltf" | "3dtiles" | "ply";
 
+export interface ColliderGenerationProgress {
+    stage: string;
+    message: string;
+    percent?: number;
+}
+
 // 3D Tiles 场景原点(WGS84 度 / 米)
 export interface TilesOrigin {
     lon: number;
@@ -186,20 +192,59 @@ export class Viewer {
     }
 
     // 生成碰撞体:合并当前模型所有 mesh 为 trimesh 线框
-    async generateCollider(plyDepth = 9): Promise<boolean> {
+    async generateCollider(
+        plyDepth = 9,
+        onProgress?: (progress: ColliderGenerationProgress) => void
+    ): Promise<boolean> {
         if (!this.currentModel) return false;
 
         if (this.plyBytes) {
-            const response = await fetch(`/api/3dgs-collider?depth=${plyDepth}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/octet-stream" },
-                body: this.plyBytes,
-            });
+            const requestId = crypto.randomUUID();
+            const progressSource = onProgress
+                ? new EventSource(`/api/3dgs-collider/progress?id=${encodeURIComponent(requestId)}`)
+                : null;
+            if (progressSource && onProgress) {
+                progressSource.onmessage = (event) => {
+                    try {
+                        const progress = JSON.parse(event.data) as ColliderGenerationProgress;
+                        if (progress.stage !== "ready") onProgress(progress);
+                    } catch {
+                        // 忽略无法解析的进度事件,最终结果仍由 POST 请求决定
+                    }
+                };
+                await new Promise<void>((resolve) => {
+                    let settled = false;
+                    const finish = (): void => {
+                        if (settled) return;
+                        settled = true;
+                        window.clearTimeout(timeout);
+                        resolve();
+                    };
+                    const timeout = window.setTimeout(finish, 1_000);
+                    progressSource.addEventListener("open", finish, { once: true });
+                    progressSource.addEventListener("error", finish, { once: true });
+                });
+            }
+
+            let response: Response;
+            try {
+                response = await fetch(
+                    `/api/3dgs-collider?depth=${plyDepth}&id=${encodeURIComponent(requestId)}`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/octet-stream" },
+                        body: this.plyBytes,
+                    }
+                );
+            } finally {
+                progressSource?.close();
+            }
             if (!response.ok) {
                 const detail = (await response.text()).trim();
                 throw new Error(detail || `Collider service failed (${response.status})`);
             }
 
+            onProgress?.({ stage: "parse", message: "Parsing generated mesh…" });
             const gltf = await this.loader.parseAsync(await response.arrayBuffer(), "");
             const merged = buildColliderGeometry(gltf.scene);
             this.disposeObject(gltf.scene);
