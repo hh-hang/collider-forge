@@ -24,6 +24,9 @@ const errorTargetInput = document.getElementById("error-target") as HTMLInputEle
 const errorTargetValue = document.getElementById("error-target-value") as HTMLSpanElement;
 const cacheMaxSizeInput = document.getElementById("cache-max-size") as HTMLInputElement;
 const cacheMaxBytesInput = document.getElementById("cache-max-bytes") as HTMLInputElement;
+const groupPly = document.getElementById("group-ply") as HTMLDivElement;
+const plyDepthInput = document.getElementById("ply-depth") as HTMLInputElement;
+const plyDepthValue = document.getElementById("ply-depth-value") as HTMLSpanElement;
 const dracoExportInput = document.getElementById("draco-export") as HTMLInputElement;
 const rowShowCollider = document.getElementById("row-show-collider") as HTMLLabelElement;
 const showColliderInput = document.getElementById("show-collider") as HTMLInputElement;
@@ -61,6 +64,7 @@ function onModelLoaded(name: string): void {
     } else {
         groupTiles.classList.add("hidden");
     }
+    groupPly.classList.toggle("hidden", !viewer.isPly());
 
     setStatus(`Loaded: ${name}`);
 }
@@ -82,7 +86,9 @@ function onColliderCleared(): void {
 }
 
 function currentFormat(): ModelFormat {
-    return formatSelect.value as ModelFormat;
+    const format = formatSelect.value;
+    if (format === "gltf" || format === "3dtiles" || format === "ply") return format;
+    return "3dtiles";
 }
 
 // http(s) 地址走 Vite dev 代理,其它地址原样返回
@@ -103,21 +109,26 @@ async function loadFromUrl(url: string): Promise<void> {
 }
 
 async function loadFromFile(file: File): Promise<void> {
-    if (!/\.(glb|gltf)$/i.test(file.name)) {
-        setStatus("Local files support glb / gltf only. Use URL or Ion for 3D Tiles.");
+    if (!/\.(glb|gltf|ply)$/i.test(file.name)) {
+        setStatus("Local files support glb / gltf / ply. Use URL or Ion for 3D Tiles.");
         return;
     }
 
-    // 拖入的本地文件按 glb/gltf 处理(3D Tiles 是多文件目录,需走 URL)
-    const objectUrl = URL.createObjectURL(file);
     setStatus("Loading…");
     try {
-        await viewer.loadModel(objectUrl, "gltf");
+        if (/\.ply$/i.test(file.name)) {
+            await viewer.loadPly(await file.arrayBuffer());
+        } else {
+            const objectUrl = URL.createObjectURL(file);
+            try {
+                await viewer.loadModel(objectUrl, "gltf");
+            } finally {
+                URL.revokeObjectURL(objectUrl);
+            }
+        }
         onModelLoaded(file.name);
     } catch (err) {
         setStatus(`Load failed: ${(err as Error).message}`);
-    } finally {
-        URL.revokeObjectURL(objectUrl);
     }
 }
 
@@ -130,7 +141,9 @@ formatSelect.addEventListener("change", () => {
         urlInput.placeholder =
             formatSelect.value === "3dtiles"
                 ? "https://example.com/tileset.json"
-                : "https://example.com/model.glb";
+                : formatSelect.value === "ply"
+                  ? "https://example.com/model.ply"
+                  : "https://example.com/model.glb";
     }
 });
 
@@ -227,18 +240,33 @@ cacheMaxBytesInput.addEventListener("change", () => {
     setStatus(`Cache limit = ${v} GB`);
 });
 
+// ==================== 3DGS PLY 参数 ====================
+plyDepthInput.addEventListener("input", () => {
+    plyDepthValue.textContent = plyDepthInput.value;
+});
+
 // ==================== 碰撞体操作 ====================
-// 生成碰撞体:合并全精度 trimesh,线框显示
+// 生成碰撞体:mesh 直接合并;PLY 调用 Poisson 重建服务;结果统一线框显示
 btnGenerate.addEventListener("click", () => {
-    setStatus("Generating collider…");
-    // 让状态文字先渲染再做(合并可能较重)
-    requestAnimationFrame(() => {
-        const ok = viewer.generateCollider();
-        if (ok) {
-            onColliderReady();
-            setStatus("Collider generated (wireframe)");
-        } else {
-            setStatus("Generation failed: no usable geometry in scene");
+    const isPly = viewer.isPly();
+    const depth = Number(plyDepthInput.value);
+    setStatus(isPly ? `Reconstructing PLY collider (depth ${depth})…` : "Generating collider…");
+    btnGenerate.disabled = true;
+
+    // 让状态文字先渲染再开始较重的合并或服务端重建
+    requestAnimationFrame(async () => {
+        try {
+            const ok = await viewer.generateCollider(depth);
+            if (ok) {
+                onColliderReady();
+                setStatus("Collider generated (wireframe)");
+            } else {
+                setStatus("Generation failed: no usable geometry in scene");
+            }
+        } catch (err) {
+            setStatus(`Generation failed: ${(err as Error).message}`);
+        } finally {
+            btnGenerate.disabled = false;
         }
     });
 });

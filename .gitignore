@@ -2,3 +2,7 @@ node_modules
 dist
 *.local
 .DS_Store
+
+tools/3dgs-collider/build/*/obj/
+tools/3dgs-collider/build/*/3dgs_collider.dir/
+tools/3dgs-collider/data/

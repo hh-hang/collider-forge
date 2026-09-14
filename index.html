@@ -52,6 +52,22 @@
                         <input id="cache-max-bytes" type="number" min="0.1" step="0.1" />
                     </div>
                 </div>
+
+                <!-- 3DGS PLY 碰撞体重建参数 -->
+                <div id="group-ply" class="group hidden">
+                    <div class="group-title">3DGS PLY</div>
+                    <div id="ply-depth-row">
+                        <div class="slider-label">
+                            <span>Poisson depth</span>
+                            <span id="ply-depth-value">9</span>
+                        </div>
+                        <input id="ply-depth" type="range" min="6" max="10" step="1" value="9" />
+                        <div class="slider-hint">
+                            <span>Coarse</span>
+                            <span>Detailed</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- 隐藏的碰撞体文件选择 -->
@@ -59,10 +75,10 @@
 
             <!-- 全屏遮罩:无模型时铺满屏幕,导入面板浮于其中 -->
             <div id="overlay">
-                <!-- 导入区:拖拽 glb 或输入模型地址 -->
+                <!-- 导入区:拖拽模型或输入模型地址 -->
                 <div id="import-panel">
-                    <button id="btn-pick-file" title="Local files are supported for glb / gltf only">
-                        Choose local glb / gltf
+                    <button id="btn-pick-file" title="Local glb / gltf / ply files are supported">
+                        Choose local glb / gltf / ply
                     </button>
                     <div class="import-divider">or enter a URL</div>
                     <div id="source-row">
@@ -70,6 +86,7 @@
                             <option value="3dtiles">3D Tiles</option>
                             <option value="ion">Google 3D Tiles (Ion)</option>
                             <option value="gltf">glb / gltf</option>
+                            <option value="ply">3DGS PLY</option>
                         </select>
                         <div id="url-row">
                             <input id="url-input" type="text" placeholder="https://example.com/tileset.json" />
@@ -96,7 +113,7 @@
                 </div>
 
                 <!-- 隐藏的模型文件选择 -->
-                <input id="model-file" type="file" accept=".glb,.gltf" hidden />
+                <input id="model-file" type="file" accept=".glb,.gltf,.ply" hidden />
             </div>
 
             <!-- 导出选项弹窗 -->

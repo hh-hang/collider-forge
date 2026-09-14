@@ -7,9 +7,10 @@ import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.j
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { TilesRenderer } from "3d-tiles-renderer/three";
 import { CesiumIonAuthPlugin } from "3d-tiles-renderer/plugins";
+import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import { buildColliderGeometry, optimizeForExport, dracoCompressGLB } from "./collider.ts";
 
-export type ModelFormat = "gltf" | "3dtiles";
+export type ModelFormat = "gltf" | "3dtiles" | "ply";
 
 // 3D Tiles 场景原点(WGS84 度 / 米)
 export interface TilesOrigin {
@@ -30,12 +31,16 @@ export class Viewer {
 
     private readonly loader: GLTFLoader;
     private readonly grid: THREE.GridHelper;
+    private readonly spark: SparkRenderer;
 
     // 3D Tiles 加载器,仅 tileset 模式存在
     private tiles: TilesRenderer | null = null;
 
     // 当前生成或导入的碰撞体线框
     private collider: THREE.Mesh | null = null;
+
+    // PLY 原始数据既供 Spark 显示,也供本机 Poisson 工具生成碰撞体
+    private plyBytes: ArrayBuffer | null = null;
 
     // tileset 加载事件可能重复触发,取景只做一次
     private tilesFramed = false;
@@ -63,6 +68,9 @@ export class Viewer {
             .setKTX2Loader(ktx2)
             .setMeshoptDecoder(MeshoptDecoder);
 
+        this.spark = new SparkRenderer({ renderer: this.renderer });
+        this.scene.add(this.spark);
+
         this.controls = new OrbitControls(this.camera, canvas);
         this.controls.enableDamping = true;
 
@@ -88,10 +96,35 @@ export class Viewer {
     // 加载模型:url 可为远程地址或 ObjectURL
     async loadModel(url: string, format: ModelFormat): Promise<THREE.Object3D> {
         if (format === "3dtiles") return this.loadTileset(url);
+        if (format === "ply") {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`PLY request failed (${response.status} ${response.statusText})`);
+            }
+            return this.loadPly(await response.arrayBuffer());
+        }
         const gltf = await this.loader.loadAsync(url);
         this.setModel(gltf.scene);
         this.frameModel(gltf.scene);
         return gltf.scene;
+    }
+
+    // 从内存加载 3D Gaussian Splatting PLY
+    async loadPly(fileBytes: ArrayBuffer): Promise<SplatMesh> {
+        const splat = new SplatMesh({ fileBytes, fileName: "model.ply" });
+        try {
+            await splat.initialized;
+        } catch (err) {
+            splat.dispose();
+            throw err;
+        }
+
+        this.setModel(splat);
+        // Spark 内部会复制待解析数据;这里保留原始缓冲区供碰撞体接口复用,
+        // 避免大型 3DGS 文件再产生一份长期驻留的副本。
+        this.plyBytes = fileBytes;
+        this.frameBox(splat.getBoundingBox());
+        return splat;
     }
 
     // 加载普通 3D Tiles tileset(URL)
@@ -146,14 +179,35 @@ export class Viewer {
             }
         }
         this.currentModel = model;
+        this.plyBytes = null;
         this.scene.add(model);
         // 新模型加载 → 旧碰撞体作废
         this.disposeCollider();
     }
 
     // 生成碰撞体:合并当前模型所有 mesh 为 trimesh 线框
-    generateCollider(): boolean {
+    async generateCollider(plyDepth = 9): Promise<boolean> {
         if (!this.currentModel) return false;
+
+        if (this.plyBytes) {
+            const response = await fetch(`/api/3dgs-collider?depth=${plyDepth}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/octet-stream" },
+                body: this.plyBytes,
+            });
+            if (!response.ok) {
+                const detail = (await response.text()).trim();
+                throw new Error(detail || `Collider service failed (${response.status})`);
+            }
+
+            const gltf = await this.loader.parseAsync(await response.arrayBuffer(), "");
+            const merged = buildColliderGeometry(gltf.scene);
+            this.disposeObject(gltf.scene);
+            if (!merged) return false;
+            this.setColliderGeometry(merged);
+            return true;
+        }
+
         const merged = buildColliderGeometry(this.currentModel);
         if (!merged) return false;
         this.setColliderGeometry(merged);
@@ -202,6 +256,11 @@ export class Viewer {
     // 当前是否加载的是 3D Tiles
     isTileset(): boolean {
         return this.tiles !== null;
+    }
+
+    // 当前是否加载的是 3DGS PLY
+    isPly(): boolean {
+        return this.plyBytes !== null;
     }
 
     // 读取 tileset 的 errorTarget(SSE 目标;越小 LOD 越精细)
@@ -257,7 +316,10 @@ export class Viewer {
 
     // 相机自动对准模型
     private frameModel(model: THREE.Object3D): void {
-        const box = new THREE.Box3().setFromObject(model);
+        this.frameBox(new THREE.Box3().setFromObject(model));
+    }
+
+    private frameBox(box: THREE.Box3): void {
         if (box.isEmpty()) return;
 
         const size = box.getSize(new THREE.Vector3());
@@ -332,6 +394,10 @@ export class Viewer {
     }
 
     private disposeObject(obj: THREE.Object3D): void {
+        if (obj instanceof SplatMesh) {
+            obj.dispose();
+            return;
+        }
         obj.traverse((child) => {
             const mesh = child as THREE.Mesh;
             if (mesh.geometry) mesh.geometry.dispose();

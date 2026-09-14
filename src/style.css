@@ -135,8 +135,9 @@ body,
     border-color: #4a90d9;
 }
 
-/* errorTarget 滑块 */
-#error-target-row {
+/* 参数滑块 */
+#error-target-row,
+#ply-depth-row {
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -148,7 +149,8 @@ body,
     color: #c8ccd2;
 }
 
-#error-target-value {
+#error-target-value,
+#ply-depth-value {
     color: #4a90d9;
     font-variant-numeric: tabular-nums;
 }
@@ -160,7 +162,8 @@ body,
     color: #6b7178;
 }
 
-#error-target {
+#error-target,
+#ply-depth {
     -webkit-appearance: none;
     appearance: none;
     width: 100%;
@@ -171,7 +174,8 @@ body,
     outline: none;
 }
 
-#error-target::-webkit-slider-thumb {
+#error-target::-webkit-slider-thumb,
+#ply-depth::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
     width: 14px;
@@ -182,7 +186,8 @@ body,
     cursor: pointer;
 }
 
-#error-target::-moz-range-thumb {
+#error-target::-moz-range-thumb,
+#ply-depth::-moz-range-thumb {
     width: 14px;
     height: 14px;
     border-radius: 50%;
