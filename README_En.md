@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | English
 
-Visual tool for loading glTF, 3D Tiles, and 3DGS PLY, generating collision meshes, and exporting collider `.glb` files.
+Visual tool for loading glTF, 3D Tiles, and Gaussian Splat / point-cloud assets, generating collision meshes, and exporting collider `.glb` files.
 
 ![collider-forge demo](./public/imgs/demo.jpg)
 
@@ -24,10 +24,13 @@ Open http://localhost:5174 in your browser.
 - Load 3D Tiles tilesets from URL.
 - Load Google 3D Tiles through Cesium Ion.
 - Generate a merged trimesh collider from visible model geometry.
-- Preview local or remote 3DGS `.ply` files with Spark and reconstruct colliders with an adjustable Poisson depth.
+- Preview local or remote `.ply`, `.spz`, `.splat`, `.ksplat`, and bundled `.sog` files with Spark.
+- Extract decoded point positions from Spark and reconstruct colliders with an adjustable Poisson depth.
 - Import an existing collider `.glb`.
 - Export collider `.glb` with optional Draco compression.
 - Choose export up axis for Cesium-style Z-up or glTF / three.js Y-up workflows.
+
+> Only single-file bundled `.sog` assets are currently supported. Unbundled SOG datasets made up of `meta.json` and multiple WebP files are not yet supported.
 
 ## Credits
 

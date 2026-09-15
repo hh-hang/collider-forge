@@ -1,4 +1,4 @@
-import { Viewer, type ModelFormat } from "./viewer.ts";
+import { Viewer, isSplatFormat, type ModelFormat } from "./viewer.ts";
 import { DEFAULT_ORIGIN } from "./landmarks.ts";
 
 // Google 实景 3D Tiles 在 Cesium Ion 上的 asset id
@@ -24,7 +24,7 @@ const errorTargetInput = document.getElementById("error-target") as HTMLInputEle
 const errorTargetValue = document.getElementById("error-target-value") as HTMLSpanElement;
 const cacheMaxSizeInput = document.getElementById("cache-max-size") as HTMLInputElement;
 const cacheMaxBytesInput = document.getElementById("cache-max-bytes") as HTMLInputElement;
-const groupPly = document.getElementById("group-ply") as HTMLDivElement;
+const groupSplat = document.getElementById("group-splat") as HTMLDivElement;
 const plyDepthInput = document.getElementById("ply-depth") as HTMLInputElement;
 const plyDepthValue = document.getElementById("ply-depth-value") as HTMLSpanElement;
 const dracoExportInput = document.getElementById("draco-export") as HTMLInputElement;
@@ -94,7 +94,7 @@ function onModelLoaded(name: string): void {
     } else {
         groupTiles.classList.add("hidden");
     }
-    groupPly.classList.toggle("hidden", !viewer.isPly());
+    groupSplat.classList.toggle("hidden", !viewer.isSplat());
 
     setStatus(`Loaded: ${name}`);
 }
@@ -117,7 +117,7 @@ function onColliderCleared(): void {
 
 function currentFormat(): ModelFormat {
     const format = formatSelect.value;
-    if (format === "gltf" || format === "3dtiles" || format === "ply") return format;
+    if (format === "gltf" || format === "3dtiles" || isSplatFormat(format)) return format;
     return "3dtiles";
 }
 
@@ -139,15 +139,17 @@ async function loadFromUrl(url: string): Promise<void> {
 }
 
 async function loadFromFile(file: File): Promise<void> {
-    if (!/\.(glb|gltf|ply)$/i.test(file.name)) {
-        setStatus("Local files support glb / gltf / ply. Use URL or Ion for 3D Tiles.");
+    if (!/\.(glb|gltf|ply|spz|splat|ksplat|sog)$/i.test(file.name)) {
+        setStatus(
+            "Local files support glb / gltf / ply / spz / splat / ksplat / bundled sog."
+        );
         return;
     }
 
     setStatus("Loading…");
     try {
-        if (/\.ply$/i.test(file.name)) {
-            await viewer.loadPly(await file.arrayBuffer());
+        if (/\.(ply|spz|splat|ksplat|sog)$/i.test(file.name)) {
+            await viewer.loadSplat(await file.arrayBuffer(), file.name);
         } else {
             const objectUrl = URL.createObjectURL(file);
             try {
@@ -168,12 +170,12 @@ formatSelect.addEventListener("change", () => {
     ionPanel.classList.toggle("hidden", !isIon);
     urlRow.classList.toggle("hidden", isIon);
     if (!isIon) {
-        urlInput.placeholder =
-            formatSelect.value === "3dtiles"
-                ? "https://example.com/tileset.json"
-                : formatSelect.value === "ply"
-                  ? "https://example.com/model.ply"
-                  : "https://example.com/model.glb";
+        const format = formatSelect.value;
+        urlInput.placeholder = format === "3dtiles"
+            ? "https://example.com/tileset.json"
+            : isSplatFormat(format)
+              ? `https://example.com/model.${format}`
+              : "https://example.com/model.glb";
     }
 });
 
@@ -270,18 +272,18 @@ cacheMaxBytesInput.addEventListener("change", () => {
     setStatus(`Cache limit = ${v} GB`);
 });
 
-// ==================== 3DGS PLY 参数 ====================
+// ==================== Gaussian Splat / 点云参数 ====================
 plyDepthInput.addEventListener("input", () => {
     plyDepthValue.textContent = plyDepthInput.value;
 });
 
 // ==================== 碰撞体操作 ====================
-// 生成碰撞体:mesh 直接合并;PLY 调用 Poisson 重建服务;结果统一线框显示
+// 生成碰撞体：mesh 直接合并；Gaussian Splat 提取中心后调用 Poisson；结果统一线框显示
 btnGenerate.addEventListener("click", () => {
-    const isPly = viewer.isPly();
+    const isSplat = viewer.isSplat();
     const depth = Number(plyDepthInput.value);
     startBusyStatus(
-        isPly ? `Reconstructing PLY collider (depth ${depth})…` : "Generating collider…"
+        isSplat ? `Reconstructing point cloud collider (depth ${depth})…` : "Generating collider…"
     );
     btnGenerate.disabled = true;
 

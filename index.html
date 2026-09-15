@@ -53,9 +53,9 @@
                     </div>
                 </div>
 
-                <!-- 3DGS PLY 碰撞体重建参数 -->
-                <div id="group-ply" class="group hidden">
-                    <div class="group-title">3DGS PLY</div>
+                <!-- Gaussian Splat / 点云碰撞体重建参数 -->
+                <div id="group-splat" class="group hidden">
+                    <div class="group-title">Gaussian Splat / Point Cloud</div>
                     <div id="ply-depth-row">
                         <div class="slider-label">
                             <span>Poisson depth</span>
@@ -77,8 +77,11 @@
             <div id="overlay">
                 <!-- 导入区:拖拽模型或输入模型地址 -->
                 <div id="import-panel">
-                    <button id="btn-pick-file" title="Local glb / gltf / ply files are supported">
-                        Choose local glb / gltf / ply
+                    <button
+                        id="btn-pick-file"
+                        title="Local glb / gltf / ply / spz / splat / ksplat / sog files are supported"
+                    >
+                        Choose local model
                     </button>
                     <div class="import-divider">or enter a URL</div>
                     <div id="source-row">
@@ -87,6 +90,10 @@
                             <option value="ion">Google 3D Tiles (Ion)</option>
                             <option value="gltf">glb / gltf</option>
                             <option value="ply">3DGS PLY</option>
+                            <option value="spz">3DGS SPZ</option>
+                            <option value="splat">3DGS SPLAT</option>
+                            <option value="ksplat">3DGS KSPLAT</option>
+                            <option value="sog">3DGS SOG (bundled)</option>
                         </select>
                         <div id="url-row">
                             <input id="url-input" type="text" placeholder="https://example.com/tileset.json" />
@@ -113,7 +120,12 @@
                 </div>
 
                 <!-- 隐藏的模型文件选择 -->
-                <input id="model-file" type="file" accept=".glb,.gltf,.ply" hidden />
+                <input
+                    id="model-file"
+                    type="file"
+                    accept=".glb,.gltf,.ply,.spz,.splat,.ksplat,.sog"
+                    hidden
+                />
             </div>
 
             <!-- 导出选项弹窗 -->
