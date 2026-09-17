@@ -8,14 +8,17 @@ Visual tool for loading glTF, 3D Tiles, and Gaussian Splat / point-cloud assets,
 
 ## Getting Started
 
-```bash
-git clone https://github.com/hh-hang/collider-forge.git
-cd collider-forge
-npm install
-npm run dev
-```
+The current prebuilt version supports Windows x64 only.
 
-Open http://localhost:5174 in your browser.
+1. Download and extract [collider-forge v0.1.0](https://github.com/hh-hang/collider-forge/archive/refs/tags/v0.1.0.zip).
+2. Run the following commands in the extracted project directory:
+
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+3. Open http://localhost:5174 in your browser.
 
 ## Features
 

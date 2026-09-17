@@ -8,14 +8,17 @@
 
 ## 快速开始
 
-```bash
-git clone https://github.com/hh-hang/collider-forge.git
-cd collider-forge
-npm install
-npm run dev
-```
+当前预编译版本仅支持 Windows x64。
 
-打开浏览器访问 http://localhost:5174
+1. 下载并解压 [collider-forge v0.1.0](https://github.com/hh-hang/collider-forge/archive/refs/tags/v0.1.0.zip)。
+2. 在解压后的项目目录中运行：
+
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+3. 打开浏览器访问 http://localhost:5174。
 
 ## 功能
 
