@@ -204,13 +204,14 @@ export class Viewer {
     // 生成碰撞体:合并当前模型所有 mesh 为 trimesh 线框
     async generateCollider(
         plyDepth = 9,
-        onProgress?: (progress: ColliderGenerationProgress) => void
+        onProgress?: (progress: ColliderGenerationProgress) => void,
+        trimUnsupported = false
     ): Promise<boolean> {
         if (!this.currentModel) return false;
 
         if (this.currentSplat) {
             onProgress?.({ stage: "extract", message: "Extracting Gaussian centers…" });
-            const pointCloudPly = createPointCloudPly(this.currentSplat);
+            const pointCloudPly = createPointCloudPly(this.currentSplat, trimUnsupported);
             const requestId = crypto.randomUUID();
             const progressSource = onProgress
                 ? new EventSource(`/api/3dgs-collider/progress?id=${encodeURIComponent(requestId)}`)
@@ -241,7 +242,7 @@ export class Viewer {
             let response: Response;
             try {
                 response = await fetch(
-                    `/api/3dgs-collider?depth=${plyDepth}&id=${encodeURIComponent(requestId)}`,
+                    `/api/3dgs-collider?depth=${plyDepth}&trimUnsupported=${trimUnsupported}&id=${encodeURIComponent(requestId)}`,
                     {
                         method: "POST",
                         headers: { "Content-Type": "application/octet-stream" },

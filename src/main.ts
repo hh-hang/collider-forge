@@ -27,6 +27,7 @@ const cacheMaxBytesInput = document.getElementById("cache-max-bytes") as HTMLInp
 const groupSplat = document.getElementById("group-splat") as HTMLDivElement;
 const plyDepthInput = document.getElementById("ply-depth") as HTMLInputElement;
 const plyDepthValue = document.getElementById("ply-depth-value") as HTMLSpanElement;
+const plyTrimUnsupportedInput = document.getElementById("ply-trim-unsupported") as HTMLInputElement;
 const dracoExportInput = document.getElementById("draco-export") as HTMLInputElement;
 const rowShowCollider = document.getElementById("row-show-collider") as HTMLLabelElement;
 const showColliderInput = document.getElementById("show-collider") as HTMLInputElement;
@@ -282,6 +283,7 @@ plyDepthInput.addEventListener("input", () => {
 btnGenerate.addEventListener("click", () => {
     const isSplat = viewer.isSplat();
     const depth = Number(plyDepthInput.value);
+    const trimUnsupported = plyTrimUnsupportedInput.checked;
     startBusyStatus(
         isSplat ? `Reconstructing point cloud collider (depth ${depth})…` : "Generating collider…"
     );
@@ -292,7 +294,7 @@ btnGenerate.addEventListener("click", () => {
         try {
             const ok = await viewer.generateCollider(depth, (progress) => {
                 updateBusyStatus(progress.message);
-            });
+            }, trimUnsupported);
             if (ok) {
                 onColliderReady();
                 finishBusyStatus("Collider generated (wireframe)");

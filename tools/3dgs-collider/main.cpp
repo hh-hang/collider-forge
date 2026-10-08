@@ -187,31 +187,43 @@ void estimateOrientedNormals(open3d::geometry::PointCloud& cloud)
 
 }  // namespace
 
-// Clean points -> normals -> PoissonRecon(depth) -> support trimming -> mesh.
-// Product: input must be .ply; only tunable param is poisson depth.
+// Clean points -> normals -> PoissonRecon(depth) -> optional support trimming.
 int run(int argc, char** argv)
 {
     if (argc < 3)
     {
         std::cout
             << "Usage:\n"
-            << "3dgs_collider.exe input.ply output.(ply|glb|obj|stl) [depth]\n"
+            << "3dgs_collider.exe input.ply output.(ply|glb|obj|stl) [depth] [--trim-unsupported]\n"
             << "  input must be .ply\n"
-            << "  depth default = 9; unsupported surfaces are trimmed automatically\n";
+            << "  depth default = 9; support trimming is OFF unless --trim-unsupported is set\n";
         return 0;
     }
 
     std::string inputPath = argv[1];
     std::string outputPath = argv[2];
     int depth = 9;
-    if (argc >= 4)
+    bool depthProvided = false;
+    bool trimUnsupported = false;
+    for (int i = 3; i < argc; ++i)
     {
+        const std::string argument = argv[i];
+        if (argument == "--trim-unsupported")
+        {
+            trimUnsupported = true;
+            continue;
+        }
+        if (depthProvided || argument.rfind("--", 0) == 0)
+        {
+            throw std::runtime_error("Unknown argument: " + argument);
+        }
         size_t consumed = 0;
-        depth = std::stoi(argv[3], &consumed);
-        if (consumed != std::string(argv[3]).size())
+        depth = std::stoi(argument, &consumed);
+        if (consumed != argument.size())
         {
             throw std::runtime_error("depth must be an integer in [6, 10].");
         }
+        depthProvided = true;
     }
 
     if (!endsWithIgnoreCase(inputPath, ".ply"))
@@ -247,12 +259,14 @@ int run(int argc, char** argv)
     {
         throw std::runtime_error("At least 32 distinct finite points are required.");
     }
-    // Remove isolated noise before it enlarges the reconstruction domain or
-    // becomes apparent support for invented geometry.
-    cloud = removeIsolatedPoints(*cloud);
-    if (cloud->points_.size() < 32)
+    if (trimUnsupported)
     {
-        throw std::runtime_error("Too few points remain after outlier removal.");
+        // Isolated noise must not become support for invented geometry.
+        cloud = removeIsolatedPoints(*cloud);
+        if (cloud->points_.size() < 32)
+        {
+            throw std::runtime_error("Too few points remain after outlier removal.");
+        }
     }
     std::cout << "Clean points: " << cloud->points_.size() << std::endl;
     estimateOrientedNormals(*cloud);
@@ -285,18 +299,21 @@ int run(int argc, char** argv)
         << mesh->triangles_.size()
         << std::endl;
 
-    std::cout << "Trimming unsupported surface..." << std::endl;
-    trimUnsupportedSurface(*mesh, *cloud, densities);
+    if (trimUnsupported)
+    {
+        std::cout << "Trimming unsupported surface..." << std::endl;
+        trimUnsupportedSurface(*mesh, *cloud, densities);
+    }
     mesh->RemoveDuplicatedVertices();
     mesh->RemoveDuplicatedTriangles();
     mesh->RemoveDegenerateTriangles();
     mesh->RemoveUnreferencedVertices();
     if (mesh->triangles_.empty())
     {
-        throw std::runtime_error("No supported surface remains; check point cloud quality or increase depth.");
+        throw std::runtime_error("No surface remains; check point cloud quality or increase depth.");
     }
     mesh->ComputeVertexNormals();
-    std::cout << "Supported mesh: " << mesh->vertices_.size() << " vertices, "
+    std::cout << "Output mesh: " << mesh->vertices_.size() << " vertices, "
               << mesh->triangles_.size() << " triangles" << std::endl;
 
     bool success =

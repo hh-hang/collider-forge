@@ -79,7 +79,7 @@ function runExe(
     });
 }
 
-// 仅开发环境使用：POST /api/3dgs-collider?depth=9，请求体为原始 .ply 字节，返回 .glb
+// 仅开发环境使用：POST /api/3dgs-collider?depth=9&trimUnsupported=false，返回 .glb
 function threeDgsColliderApi(): Plugin {
     const progressClients = new Map<string, Set<ServerResponse>>();
 
@@ -167,6 +167,14 @@ function threeDgsColliderApi(): Plugin {
                         return;
                     }
 
+                    const trimRaw = url.searchParams.get("trimUnsupported") ?? "false";
+                    if (trimRaw !== "true" && trimRaw !== "false") {
+                        res.statusCode = 400;
+                        res.end("trimUnsupported must be true or false");
+                        return;
+                    }
+                    const trimUnsupported = trimRaw === "true";
+
                     const exe = resolveColliderExe();
                     if (!exe) {
                         res.statusCode = 500;
@@ -221,20 +229,20 @@ function threeDgsColliderApi(): Plugin {
 
                     const logStages = [
                         { marker: "Input points:", stage: "loaded", message: "Point cloud loaded" },
-                        { marker: "Cleaning point cloud", stage: "clean", message: "Removing isolated points…" },
+                        { marker: "Cleaning point cloud", stage: "clean", message: "Cleaning point cloud…" },
                         { marker: "Estimating normals", stage: "normals", message: "Estimating normals…" },
                         { marker: "Orienting normals", stage: "orient", message: "Orienting normals…" },
                         { marker: "Running Poisson", stage: "poisson", message: "Running Poisson reconstruction…" },
                         { marker: "Poisson mesh:", stage: "reconstructed", message: "Surface reconstructed" },
                         { marker: "Trimming unsupported surface", stage: "trim", message: "Trimming unsupported surface…" },
-                        { marker: "Supported mesh:", stage: "finalize", message: "Finalizing mesh…" },
+                        { marker: "Output mesh:", stage: "finalize", message: "Finalizing mesh…" },
                         { marker: "Finished:", stage: "write", message: "Collider file created" },
                     ];
                     let processLog = "";
                     let lastStageIndex = -1;
                     const result = await runExe(
                         exe,
-                        [inPly, outGlb, String(depth)],
+                        [inPly, outGlb, String(depth), ...(trimUnsupported ? ["--trim-unsupported"] : [])],
                         path.dirname(exe),
                         (text) => {
                             processLog += text;

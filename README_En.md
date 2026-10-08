@@ -28,7 +28,7 @@ The current prebuilt version supports Windows x64 only.
 - Load Google 3D Tiles through Cesium Ion.
 - Generate a merged trimesh collider from visible model geometry.
 - Preview local or remote `.ply`, `.spz`, `.splat`, `.ksplat`, and bundled `.sog` files with Spark.
-- Filter decoded Gaussian centers from Spark, reconstruct colliders with an adjustable Poisson depth, and trim unsupported boundary surfaces using local point-cloud spacing.
+- Extract decoded Gaussian centers from Spark and reconstruct colliders with an adjustable Poisson depth; optionally enable **Trim unsupported surfaces** to remove unsupported geometry (off by default).
 - Import an existing collider `.glb`.
 - Export collider `.glb` with optional Draco compression.
 - Choose export up axis for Cesium-style Z-up or glTF / three.js Y-up workflows.
