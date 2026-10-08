@@ -221,10 +221,13 @@ function threeDgsColliderApi(): Plugin {
 
                     const logStages = [
                         { marker: "Input points:", stage: "loaded", message: "Point cloud loaded" },
+                        { marker: "Cleaning point cloud", stage: "clean", message: "Removing isolated points…" },
                         { marker: "Estimating normals", stage: "normals", message: "Estimating normals…" },
                         { marker: "Orienting normals", stage: "orient", message: "Orienting normals…" },
                         { marker: "Running Poisson", stage: "poisson", message: "Running Poisson reconstruction…" },
-                        { marker: "Poisson mesh:", stage: "finalize", message: "Finalizing mesh…" },
+                        { marker: "Poisson mesh:", stage: "reconstructed", message: "Surface reconstructed" },
+                        { marker: "Trimming unsupported surface", stage: "trim", message: "Trimming unsupported surface…" },
+                        { marker: "Supported mesh:", stage: "finalize", message: "Finalizing mesh…" },
                         { marker: "Finished:", stage: "write", message: "Collider file created" },
                     ];
                     let processLog = "";

@@ -8,7 +8,17 @@ Windows native tool: convert a **3DGS / point-cloud `.ply`** into a collision me
 
 - **Input:** `.ply` only (convert `.sog` / `.splat` yourself first, e.g. with `splat-transform`)
 - **Tunable parameter:** **`depth` only** (Poisson octree depth, default `9`; CloudCompare often uses `8` or `9`)
-- **Pipeline aligned with CloudCompare:** estimate normals → Poisson → export (no downsample / outlier removal / decimation)
+- **Pipeline:** remove duplicate / non-finite / isolated points → estimate normals → Poisson → trim unsupported surfaces → export (no downsampling / decimation)
+
+## Boundary artifact handling
+
+Poisson extrapolates into unsampled regions. The tool checks reconstructed vertices, triangle centers, and edge midpoints against the input cloud, removing unsupported faces and bridges across empty space. The support radius uses the upper median distance to each point's nearest 8 distinct neighbors. At vertices in the lowest 1% of Poisson densities, this radius shrinks to 0.75 times the local spacing. Low density alone never forces removal of a fixed percentage of faces.
+
+An isolated point is removed only when its nearest-neighbor distance exceeds 4 times its neighbors' typical spacing, preserving legitimate sparse regions alongside dense ones. At least 32 distinct finite points are required. Exactly planar clouds use a shared plane normal.
+
+The web viewer also excludes decoded splats with opacity below `0.05` before encoding the point cloud. The CLI reads XYZ point clouds and does not interpret 3DGS opacity or covariance properties.
+
+Trimmed colliders may have open boundaries: missing data is not filled automatically. Dense erroneous splat clusters can still survive, and very sparse or thin real structures may develop gaps. Validate on the actual scene. Additional neighborhood queries increase generation time.
 
 ## Ready to run
 
