@@ -10,6 +10,7 @@ import { CesiumIonAuthPlugin } from "3d-tiles-renderer/plugins";
 import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import { buildColliderGeometry, optimizeForExport, dracoCompressGLB } from "./collider.ts";
 import { createPointCloudPly } from "./splat-point-cloud.ts";
+import { createColliderDepthMesh, renderWithColliderDepth } from "./collider-depth.ts";
 
 export type SplatFormat = "ply" | "spz" | "splat" | "ksplat" | "sog";
 export type ModelFormat = "gltf" | "3dtiles" | SplatFormat;
@@ -54,6 +55,12 @@ export class Viewer {
 
     // 当前生成或导入的碰撞体线框
     private collider: THREE.Mesh | null = null;
+    private colliderDepth: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | null = null;
+    private colliderCacheId: string | null = null;
+    private originalColliderGlb: ArrayBuffer | null = null;
+    private originalTriangleCount = 0;
+    private colliderTaskVersion = 0;
+    private colliderRequest: AbortController | null = null;
 
     // 当前 Gaussian Splat；Spark 解码后的中心坐标供 Poisson 工具复用
     private currentSplat: SplatMesh | null = null;
@@ -106,6 +113,12 @@ export class Viewer {
         this.scene.add(axesHelper);
 
         window.addEventListener("resize", this.onResize);
+        window.addEventListener("pagehide", (event) => {
+            if (!event.persisted) {
+                this.cancelColliderPostprocess();
+                this.releaseColliderCache();
+            }
+        });
         this.animate();
     }
 
@@ -198,20 +211,25 @@ export class Viewer {
         this.currentSplat = null;
         this.scene.add(model);
         // 新模型加载 → 旧碰撞体作废
-        this.disposeCollider();
+        this.clearCollider();
     }
 
     // 生成碰撞体:合并当前模型所有 mesh 为 trimesh 线框
     async generateCollider(
         plyDepth = 9,
-        onProgress?: (progress: ColliderGenerationProgress) => void,
-        trimUnsupported = false
+        onProgress?: (progress: ColliderGenerationProgress) => void
     ): Promise<boolean> {
         if (!this.currentModel) return false;
+        this.cancelColliderPostprocess();
+        const version = this.colliderTaskVersion;
 
         if (this.currentSplat) {
+            const splat = this.currentSplat;
+            const controller = new AbortController();
+            this.colliderRequest = controller;
+            let acquiredCache: string | null = null;
             onProgress?.({ stage: "extract", message: "Extracting Gaussian centers…" });
-            const pointCloudPly = createPointCloudPly(this.currentSplat, trimUnsupported);
+            const pointCloudPly = createPointCloudPly(this.currentSplat);
             const requestId = crypto.randomUUID();
             const progressSource = onProgress
                 ? new EventSource(`/api/3dgs-collider/progress?id=${encodeURIComponent(requestId)}`)
@@ -239,31 +257,41 @@ export class Viewer {
                 });
             }
 
-            let response: Response;
             try {
-                response = await fetch(
-                    `/api/3dgs-collider?depth=${plyDepth}&trimUnsupported=${trimUnsupported}&id=${encodeURIComponent(requestId)}`,
+                const response = await fetch(
+                    `/api/3dgs-collider?depth=${plyDepth}&id=${encodeURIComponent(requestId)}`,
                     {
                         method: "POST",
                         headers: { "Content-Type": "application/octet-stream" },
                         body: pointCloudPly,
+                        signal: controller.signal,
                     }
                 );
+                if (!response.ok) throw new Error((await response.text()).trim() || "Collider generation failed");
+                acquiredCache = response.headers.get("X-Collider-Cache-Id");
+                if (!acquiredCache) throw new Error("Reconstruction cache unavailable; restart the collider service.");
+                const bytes = await response.arrayBuffer();
+                onProgress?.({ stage: "parse", message: "Loading original collider…" });
+                const merged = await this.parseColliderGeometry(bytes);
+                if (version !== this.colliderTaskVersion || splat !== this.currentSplat) {
+                    merged.dispose();
+                    return false;
+                }
+                this.releaseColliderCache();
+                this.colliderCacheId = acquiredCache;
+                this.originalColliderGlb = bytes;
+                this.originalTriangleCount = this.triangleCount(merged);
+                acquiredCache = null;
+                this.setColliderGeometry(merged);
+                return true;
+            } catch (error) {
+                if (controller.signal.aborted || version !== this.colliderTaskVersion) return false;
+                throw error;
             } finally {
                 progressSource?.close();
+                if (acquiredCache) this.deleteColliderCache(acquiredCache);
+                if (this.colliderRequest === controller) this.colliderRequest = null;
             }
-            if (!response.ok) {
-                const detail = (await response.text()).trim();
-                throw new Error(detail || `Collider service failed (${response.status})`);
-            }
-
-            onProgress?.({ stage: "parse", message: "Parsing generated mesh…" });
-            const gltf = await this.loader.parseAsync(await response.arrayBuffer(), "");
-            const merged = buildColliderGeometry(gltf.scene);
-            this.disposeObject(gltf.scene);
-            if (!merged) return false;
-            this.setColliderGeometry(merged);
-            return true;
         }
 
         const merged = buildColliderGeometry(this.currentModel);
@@ -274,11 +302,107 @@ export class Viewer {
 
     // 导入已有碰撞体 glb,替换当前碰撞体
     async importCollider(url: string): Promise<boolean> {
+        this.cancelColliderPostprocess();
+        const version = this.colliderTaskVersion;
         const gltf = await this.loader.loadAsync(url);
         const merged = buildColliderGeometry(gltf.scene);
+        this.disposeObject(gltf.scene);
         if (!merged) return false;
+        if (version !== this.colliderTaskVersion) { merged.dispose(); return false; }
+        this.releaseColliderCache();
         this.setColliderGeometry(merged);
         return true;
+    }
+
+    canPostprocessCollider(): boolean {
+        return !!(this.currentSplat && this.collider && this.colliderCacheId && this.originalColliderGlb);
+    }
+
+    cancelColliderPostprocess(): void {
+        ++this.colliderTaskVersion;
+        this.colliderRequest?.abort();
+        this.colliderRequest = null;
+    }
+
+    async applyColliderPostprocess(
+        trimUnsupported: boolean,
+        removeSmallComponents: boolean,
+        minComponentTriangles = 100,
+        onProgress?: (progress: ColliderGenerationProgress) => void
+    ): Promise<boolean> {
+        if (!this.canPostprocessCollider()) return false;
+        this.cancelColliderPostprocess();
+        const version = this.colliderTaskVersion;
+        const cacheId = this.colliderCacheId!;
+        const controller = new AbortController();
+        this.colliderRequest = controller;
+        try {
+            let bytes = this.originalColliderGlb!;
+            if (trimUnsupported || removeSmallComponents) {
+                onProgress?.({ stage: "postprocess", message: "Updating collider preview…" });
+                const parameters = new URLSearchParams({
+                    cacheId, trimUnsupported: String(trimUnsupported),
+                    removeSmallComponents: String(removeSmallComponents),
+                    minComponentTriangles: String(minComponentTriangles),
+                });
+                const response = await fetch(`/api/3dgs-collider/postprocess?${parameters}`, {
+                    method: "POST", signal: controller.signal,
+                });
+                if (!response.ok) {
+                    if (response.status === 410 && version === this.colliderTaskVersion) this.releaseColliderCache();
+                    throw new Error((await response.text()).trim() || "Collider post-processing failed");
+                }
+                bytes = await response.arrayBuffer();
+            } else {
+                onProgress?.({ stage: "restore", message: "Restoring original collider…" });
+            }
+            const merged = await this.parseColliderGeometry(bytes);
+            if (version !== this.colliderTaskVersion || controller.signal.aborted || cacheId !== this.colliderCacheId) {
+                merged.dispose();
+                return false;
+            }
+            const visible = this.collider?.visible ?? true;
+            this.setColliderGeometry(merged);
+            this.setColliderVisible(visible);
+            return true;
+        } catch (error) {
+            if (controller.signal.aborted || version !== this.colliderTaskVersion) return false;
+            throw error;
+        } finally {
+            if (this.colliderRequest === controller) this.colliderRequest = null;
+        }
+    }
+
+    getColliderTriangleCount(): number {
+        return this.collider ? this.triangleCount(this.collider.geometry) : 0;
+    }
+
+    getOriginalTriangleCount(): number { return this.originalTriangleCount; }
+
+    private triangleCount(geometry: THREE.BufferGeometry): number {
+        return (geometry.index?.count ?? geometry.attributes.position.count) / 3;
+    }
+
+    private async parseColliderGeometry(bytes: ArrayBuffer): Promise<THREE.BufferGeometry> {
+        const gltf = await this.loader.parseAsync(bytes, "");
+        try {
+            const merged = buildColliderGeometry(gltf.scene);
+            if (!merged) throw new Error("No usable collider geometry");
+            return merged;
+        } finally { this.disposeObject(gltf.scene); }
+    }
+
+    private deleteColliderCache(cacheId: string): void {
+        void fetch(`/api/3dgs-collider/cache?cacheId=${encodeURIComponent(cacheId)}`, {
+            method: "DELETE", keepalive: true,
+        }).catch(() => undefined);
+    }
+
+    private releaseColliderCache(): void {
+        if (this.colliderCacheId) this.deleteColliderCache(this.colliderCacheId);
+        this.colliderCacheId = null;
+        this.originalColliderGlb = null;
+        this.originalTriangleCount = 0;
     }
 
     // 用给定几何替换当前碰撞体,以蓝色半透明线框显示
@@ -290,10 +414,16 @@ export class Viewer {
             transparent: true,
             opacity: 0.6,
             depthTest: true,
+            depthWrite: false,
             side: THREE.DoubleSide,
+            forceSinglePass: true,
         });
         this.collider = new THREE.Mesh(geom, mat);
         this.scene.add(this.collider);
+        this.colliderDepth = createColliderDepthMesh(geom);
+        // Depth occlusion stays on for 3DGS and is independent of wireframe visibility.
+        this.colliderDepth.visible = this.isSplat();
+        this.scene.add(this.colliderDepth);
     }
 
     // 是否已有碰撞体
@@ -303,6 +433,8 @@ export class Viewer {
 
     // 清除当前碰撞体
     clearCollider(): void {
+        this.cancelColliderPostprocess();
+        this.releaseColliderCache();
         this.disposeCollider();
     }
 
@@ -365,6 +497,12 @@ export class Viewer {
     }
 
     private disposeCollider(): void {
+        if (this.colliderDepth) {
+            this.scene.remove(this.colliderDepth);
+            // Geometry is shared with the wireframe and is released below.
+            this.colliderDepth.material.dispose();
+            this.colliderDepth = null;
+        }
         if (!this.collider) return;
         this.scene.remove(this.collider);
         this.collider.geometry.dispose();
@@ -482,6 +620,9 @@ export class Viewer {
                 // 发生致命异常时可以考虑停止更新，防止控制台刷屏
             }
         }
-        this.renderer.render(this.scene, this.camera);
+        renderWithColliderDepth(
+            this.renderer, this.scene, this.camera,
+            this.currentSplat, this.spark, this.colliderDepth
+        );
     };
 }

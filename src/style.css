@@ -116,6 +116,10 @@ body,
     gap: 8px;
 }
 
+.num-row.hidden {
+    display: none;
+}
+
 .num-row label {
     color: #c8ccd2;
 }

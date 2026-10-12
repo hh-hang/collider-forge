@@ -28,6 +28,10 @@ const groupSplat = document.getElementById("group-splat") as HTMLDivElement;
 const plyDepthInput = document.getElementById("ply-depth") as HTMLInputElement;
 const plyDepthValue = document.getElementById("ply-depth-value") as HTMLSpanElement;
 const plyTrimUnsupportedInput = document.getElementById("ply-trim-unsupported") as HTMLInputElement;
+const colliderPostprocessOptions = document.getElementById("collider-postprocess-options") as HTMLDivElement;
+const plyRemoveSmallComponentsInput = document.getElementById("ply-remove-small-components") as HTMLInputElement;
+const plyMinComponentTrianglesRow = document.getElementById("ply-min-component-triangles-row") as HTMLDivElement;
+const plyMinComponentTrianglesInput = document.getElementById("ply-min-component-triangles") as HTMLInputElement;
 const dracoExportInput = document.getElementById("draco-export") as HTMLInputElement;
 const rowShowCollider = document.getElementById("row-show-collider") as HTMLLabelElement;
 const showColliderInput = document.getElementById("show-collider") as HTMLInputElement;
@@ -48,6 +52,30 @@ const viewer = new Viewer(canvas);
 let busyStartedAt = 0;
 let busyMessage = "";
 let busyTimer: number | null = null;
+let colliderJobVersion = 0;
+let generationInProgress = false;
+let updatingCollider = false;
+let postprocessTimer: number | null = null;
+let appliedPostprocess = { trim: false, clean: false, count: 100 };
+
+function syncColliderControls(): void {
+    const available = viewer.canPostprocessCollider();
+    colliderPostprocessOptions.classList.toggle("hidden", !available);
+    plyTrimUnsupportedInput.disabled = !available || generationInProgress;
+    plyRemoveSmallComponentsInput.disabled = !available || generationInProgress;
+    plyMinComponentTrianglesRow.classList.toggle("hidden", !plyRemoveSmallComponentsInput.checked);
+    plyMinComponentTrianglesInput.disabled = !available || generationInProgress || !plyRemoveSmallComponentsInput.checked;
+    btnGenerate.disabled = !viewer.currentModel || generationInProgress || updatingCollider;
+    btnExport.disabled = !viewer.hasCollider() || generationInProgress || updatingCollider;
+    btnClear.disabled = !viewer.hasCollider() || generationInProgress;
+    btnImport.disabled = generationInProgress || updatingCollider;
+}
+
+function colliderPreviewStatus(): string {
+    const current = viewer.getColliderTriangleCount().toLocaleString();
+    const original = viewer.getOriginalTriangleCount();
+    return original ? `${current} triangles (original ${original.toLocaleString()})` : `${current} triangles`;
+}
 
 function setStatus(msg: string): void {
     statusEl.textContent = msg;
@@ -81,6 +109,7 @@ function finishBusyStatus(msg: string): void {
 
 // 原始模型加载成功后隐藏导入面板,启用生成碰撞体
 function onModelLoaded(name: string): void {
+    onColliderCleared();
     overlay.classList.add("hidden");
     btnGenerate.disabled = false;
 
@@ -101,19 +130,34 @@ function onModelLoaded(name: string): void {
 }
 
 // 碰撞体就绪后启用导出/清除和显示开关
-function onColliderReady(): void {
+function onColliderReady(resetOptions = true): void {
     btnExport.disabled = false;
     btnClear.disabled = false;
     rowShowCollider.classList.remove("hidden");
-    showColliderInput.checked = true;
-    viewer.setColliderVisible(true);
+    if (resetOptions) {
+        showColliderInput.checked = true;
+        viewer.setColliderVisible(true);
+        plyTrimUnsupportedInput.checked = false;
+        plyRemoveSmallComponentsInput.checked = false;
+        const count = Number(plyMinComponentTrianglesInput.value);
+        appliedPostprocess = { trim: false, clean: false, count: Number.isInteger(count) && count >= 0 && count <= 2147483647 ? count : 100 };
+        plyMinComponentTrianglesInput.value = String(appliedPostprocess.count);
+    }
+    syncColliderControls();
 }
 
 // 碰撞体清除后禁用导出/清除,隐藏显示开关
 function onColliderCleared(): void {
+    ++colliderJobVersion;
+    if (postprocessTimer !== null) window.clearTimeout(postprocessTimer);
+    postprocessTimer = null;
+    generationInProgress = updatingCollider = false;
+    plyTrimUnsupportedInput.checked = plyRemoveSmallComponentsInput.checked = false;
     btnExport.disabled = true;
     btnClear.disabled = true;
     rowShowCollider.classList.add("hidden");
+    if (busyTimer !== null) finishBusyStatus("Collider cleared");
+    syncColliderControls();
 }
 
 function currentFormat(): ModelFormat {
@@ -277,34 +321,95 @@ cacheMaxBytesInput.addEventListener("change", () => {
 plyDepthInput.addEventListener("input", () => {
     plyDepthValue.textContent = plyDepthInput.value;
 });
+function updateColliderPostprocess(delay = 0): void {
+    if (!viewer.canPostprocessCollider() || generationInProgress) return;
+    const version = ++colliderJobVersion;
+    viewer.cancelColliderPostprocess();
+    if (postprocessTimer !== null) window.clearTimeout(postprocessTimer);
+    postprocessTimer = null;
+    updatingCollider = false;
+    syncColliderControls();
+    if (plyRemoveSmallComponentsInput.checked && !plyMinComponentTrianglesInput.checkValidity()) {
+        finishBusyStatus(`Enter a valid triangle count; showing ${colliderPreviewStatus()}`);
+        return;
+    }
+    const options = {
+        trim: plyTrimUnsupportedInput.checked,
+        clean: plyRemoveSmallComponentsInput.checked,
+        count: plyRemoveSmallComponentsInput.checked ? Number(plyMinComponentTrianglesInput.value) : appliedPostprocess.count,
+    };
+    if (options.trim === appliedPostprocess.trim && options.clean === appliedPostprocess.clean &&
+        (!options.clean || options.count === appliedPostprocess.count)) {
+        finishBusyStatus(`Collider preview: ${colliderPreviewStatus()}`);
+        return;
+    }
+    updatingCollider = true;
+    startBusyStatus("Updating collider preview…");
+    syncColliderControls();
+    postprocessTimer = window.setTimeout(async () => {
+        postprocessTimer = null;
+        try {
+            const ok = await viewer.applyColliderPostprocess(options.trim, options.clean, options.count, (progress) => {
+                if (version === colliderJobVersion) updateBusyStatus(progress.message);
+            });
+            if (version !== colliderJobVersion) return;
+            if (ok) {
+                appliedPostprocess = options;
+                onColliderReady(false);
+                finishBusyStatus(`Collider updated: ${colliderPreviewStatus()}`);
+            }
+        } catch (error) {
+            if (version !== colliderJobVersion) return;
+            plyTrimUnsupportedInput.checked = appliedPostprocess.trim;
+            plyRemoveSmallComponentsInput.checked = appliedPostprocess.clean;
+            plyMinComponentTrianglesInput.value = String(appliedPostprocess.count);
+            finishBusyStatus(`Update failed; previous collider retained: ${(error as Error).message}`);
+        } finally {
+            if (version === colliderJobVersion) {
+                updatingCollider = false;
+                syncColliderControls();
+            }
+        }
+    }, delay);
+}
+plyTrimUnsupportedInput.addEventListener("change", () => updateColliderPostprocess());
+plyRemoveSmallComponentsInput.addEventListener("change", () => updateColliderPostprocess());
+plyMinComponentTrianglesInput.addEventListener("input", () => updateColliderPostprocess(250));
+plyMinComponentTrianglesInput.addEventListener("change", () => updateColliderPostprocess());
 
 // ==================== 碰撞体操作 ====================
 // 生成碰撞体：mesh 直接合并；Gaussian Splat 提取中心后调用 Poisson；结果统一线框显示
 btnGenerate.addEventListener("click", () => {
     const isSplat = viewer.isSplat();
     const depth = Number(plyDepthInput.value);
-    const trimUnsupported = plyTrimUnsupportedInput.checked;
+    const version = ++colliderJobVersion;
+    generationInProgress = true;
+    updatingCollider = false;
     startBusyStatus(
         isSplat ? `Reconstructing point cloud collider (depth ${depth})…` : "Generating collider…"
     );
-    btnGenerate.disabled = true;
+    syncColliderControls();
 
     // 让状态文字先渲染再开始较重的合并或服务端重建
     requestAnimationFrame(async () => {
         try {
             const ok = await viewer.generateCollider(depth, (progress) => {
-                updateBusyStatus(progress.message);
-            }, trimUnsupported);
+                if (version === colliderJobVersion) updateBusyStatus(progress.message);
+            });
+            if (version !== colliderJobVersion) return;
             if (ok) {
                 onColliderReady();
-                finishBusyStatus("Collider generated (wireframe)");
+                finishBusyStatus(`Original collider generated: ${colliderPreviewStatus()}`);
             } else {
                 finishBusyStatus("Generation failed: no usable geometry in scene");
             }
         } catch (err) {
-            finishBusyStatus(`Generation failed: ${(err as Error).message}`);
+            if (version === colliderJobVersion) finishBusyStatus(`Generation failed: ${(err as Error).message}`);
         } finally {
-            btnGenerate.disabled = false;
+            if (version === colliderJobVersion) {
+                generationInProgress = false;
+                syncColliderControls();
+            }
         }
     });
 });
@@ -316,19 +421,30 @@ colliderFileInput.addEventListener("change", async () => {
     colliderFileInput.value = ""; // 允许重复选同一文件
     if (!file) return;
     const objectUrl = URL.createObjectURL(file);
-    setStatus("Importing collider…");
+    const version = ++colliderJobVersion;
+    if (postprocessTimer !== null) window.clearTimeout(postprocessTimer);
+    postprocessTimer = null;
+    viewer.cancelColliderPostprocess();
+    updatingCollider = true;
+    syncColliderControls();
+    startBusyStatus("Importing collider…");
     try {
         const ok = await viewer.importCollider(objectUrl);
+        if (version !== colliderJobVersion) return;
         if (ok) {
             onColliderReady();
-            setStatus(`Collider imported: ${file.name}`);
+            finishBusyStatus(`Collider imported: ${file.name}`);
         } else {
-            setStatus("Import failed: no usable geometry in file");
+            finishBusyStatus("Import failed: no usable geometry in file");
         }
     } catch (err) {
-        setStatus(`Import failed: ${(err as Error).message}`);
+        if (version === colliderJobVersion) finishBusyStatus(`Import failed: ${(err as Error).message}`);
     } finally {
         URL.revokeObjectURL(objectUrl);
+        if (version === colliderJobVersion) {
+            updatingCollider = false;
+            syncColliderControls();
+        }
     }
 });
 

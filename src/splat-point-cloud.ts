@@ -1,27 +1,19 @@
 import type { SplatMesh } from "@sparkjsdev/spark";
 
-// With support trimming enabled, exclude weak splats as unreliable collision
-// samples. This is decoded alpha, not the PLY logit.
-const MIN_COLLIDER_OPACITY = 0.05;
-
 export function createPointCloudPly(
-    splat: Pick<SplatMesh, "forEachSplat">,
-    trimUnsupported = false
+    splat: Pick<SplatMesh, "forEachSplat">
 ): ArrayBuffer {
-    const usable = (center: { x: number; y: number; z: number }, opacity: number): boolean =>
+    const usable = (center: { x: number; y: number; z: number }): boolean =>
         Number.isFinite(Math.fround(center.x)) &&
         Number.isFinite(Math.fround(center.y)) &&
-        Number.isFinite(Math.fround(center.z)) &&
-        (!trimUnsupported || (Number.isFinite(opacity) && opacity >= MIN_COLLIDER_OPACITY));
+        Number.isFinite(Math.fround(center.z));
 
     let validCount = 0;
-    splat.forEachSplat((_index, center, _scales, _quaternion, opacity) => {
-        if (usable(center, opacity)) validCount += 1;
+    splat.forEachSplat((_index, center) => {
+        if (usable(center)) validCount += 1;
     });
     if (validCount === 0) {
-        throw new Error(trimUnsupported
-            ? "No usable collision samples (finite positions and opacity >= 0.05)"
-            : "No finite point positions found in splat file");
+        throw new Error("No finite point positions found in splat file");
     }
 
     const header = [
@@ -40,8 +32,8 @@ export function createPointCloudPly(
     new Uint8Array(result, 0, headerBytes.length).set(headerBytes);
     const view = new DataView(result, headerBytes.length);
     let outputIndex = 0;
-    splat.forEachSplat((_index, center, _scales, _quaternion, opacity) => {
-        if (!usable(center, opacity)) return;
+    splat.forEachSplat((_index, center) => {
+        if (!usable(center)) return;
         const offset = outputIndex++ * 12;
         view.setFloat32(offset, center.x, true);
         view.setFloat32(offset + 4, center.y, true);

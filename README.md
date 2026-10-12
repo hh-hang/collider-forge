@@ -28,7 +28,9 @@
 - 通过 Cesium Ion 加载 Google 3D Tiles。
 - 从模型几何生成合并后的 trimesh 碰撞体。
 - 使用 Spark 预览本地或远程 `.ply`、`.spz`、`.splat`、`.ksplat` 和打包版 `.sog`。
-- 从 Spark 解码结果中提取高斯中心，通过可调 Poisson depth 重建碰撞体；可选勾选 **Trim unsupported surfaces** 裁剪缺少点云支撑的网格（默认关闭）。
+- 从 Spark 解码结果中提取高斯中心，通过可调 Poisson depth 重建碰撞体。
+- 先生成原始 Poisson 碰撞体，再即时切换 **Trim unsupported surfaces** 和 **Remove small components** 预览后处理；无需重复重建，取消两个选项可恢复原始结果。
+- 独立碎块清理按三角形数量筛选，默认门槛 `100`；状态栏显示当前面数与原始面数，未勾选时隐藏门槛。
 - 导入已有 collider `.glb`。
 - 导出 collider `.glb`，可选 Draco 压缩。
 - 导出时可选择 Cesium 常用的 Z-up，或 glTF / three.js 常用的 Y-up。

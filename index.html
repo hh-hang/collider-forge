@@ -67,10 +67,21 @@
                             <span>Detailed</span>
                         </div>
                     </div>
-                    <label class="panel-row" title="Remove surfaces without nearby point-cloud support. May leave gaps; applies on Generate.">
-                        <input id="ply-trim-unsupported" type="checkbox" />
-                        Trim unsupported surfaces
-                    </label>
+                    <div id="collider-postprocess-options" class="group hidden">
+                        <div class="group-title">Post-processing</div>
+                        <label class="panel-row" title="Remove surfaces without nearby point-cloud support. Updates the generated collider preview; may leave gaps.">
+                            <input id="ply-trim-unsupported" type="checkbox" disabled />
+                            Trim unsupported surfaces
+                        </label>
+                        <label class="panel-row" title="Remove disconnected mesh pieces below the triangle-count threshold. Updates the generated collider preview; may remove real objects with few triangles.">
+                            <input id="ply-remove-small-components" type="checkbox" disabled />
+                            Remove small components
+                        </label>
+                        <div id="ply-min-component-triangles-row" class="num-row hidden" title="Minimum triangles per connected component. Components with fewer triangles are removed; increase to remove more pieces.">
+                            <label for="ply-min-component-triangles">Min triangles</label>
+                            <input id="ply-min-component-triangles" type="number" min="0" max="2147483647" step="1" value="100" required disabled />
+                        </div>
+                    </div>
                 </div>
             </div>
 
